@@ -38,6 +38,43 @@ Captures errors with full context and proposes fixes:
 - **Spike detection** — "This error jumped 10x in the last hour. Likely a regression from a recent deploy."
 - **Recurring errors** — "This error has been happening consistently for 7 days. It needs a real fix, not a retry."
 
+## Two evolution modes
+
+### Default: Human-in-the-loop
+
+The safe path. Proprio detects issues and creates GitHub Issues with full context (stack traces, evidence, code locations). A human triages and approves. Then Claude Code (or any AI coding tool) reads the issue, fixes the code, and opens a PR.
+
+```
+proprio analyze → Finding → GitHub Issue
+                                ↓
+                        Human reviews + approves
+                                ↓
+                        Claude Code fixes it → PR
+```
+
+### Auto-evolve (opt-in)
+
+For teams that want faster iteration. Proprio detects issues, reads the source code, generates concrete fix diffs via Claude, and includes them in the report. Enable with `generateFixes: true`.
+
+```
+proprio analyze → Finding → LLM reads source → Fix diff → PR with proposed code change
+```
+
+```typescript
+await runPipeline({
+  storage,
+  config,
+  generateFixes: true,  // enable auto-evolve
+});
+```
+
+Fix proposals include:
+- The exact file and lines to change
+- A diff showing old code vs new code
+- An explanation of why the fix works
+- A confidence score
+- A breaking-change flag
+
 ## Quick start
 
 ```bash
@@ -191,33 +228,16 @@ Your App ──track()──────────> Proprio SDK ──buffer�
                     └───────────┬───────────┘
                                 │
                           Findings
-                                │
-                    ┌───────────┴───────────┐
-                    │  Reporters            │
-                    │  (GitHub Issues, CLI) │
-                    └───────────────────────┘
+                       ┌────────┴────────┐
+                       │                 │
+                 Default mode      Auto-evolve mode
+                       │                 │
+                 GitHub Issue      Fix diff generated
+                       │                 │
+                 Human approves    PR with code change
+                       │
+                 Claude Code fixes
 ```
-
-1. Your app tracks events, decisions, and errors via the SDK
-2. Everything buffers locally (SQLite) — no external service needed
-3. Analyzers run deterministic rules to detect patterns
-4. Ambiguous cases escalate to Claude for reasoning
-5. Findings get reported as GitHub Issues (or console output)
-
-The SDK never throws, buffers in memory, and has zero network overhead. Your app doesn't slow down.
-
-## Reporters
-
-- **Console** — prints findings to stdout (default)
-- **GitHub Issues** — creates issues with severity badges, evidence tables, and suggestions. Deduplicates against open issues.
-
-## LLM escalation
-
-When a deterministic rule can't decide (e.g., 25% drop-off — is that friction or natural filtering?), the case gets escalated to Claude. The LLM returns structured findings with reasoning.
-
-LLM is optional. Set `"provider": "none"` to run pure rules.
-
-Cost is predictable: `maxEscalationsPerRun` caps how many cases go to the LLM per analysis (default: 10).
 
 ## SDK design principles
 
