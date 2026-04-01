@@ -65,6 +65,9 @@ export type FindingType =
   | "rule_drift"
   | "input_correlation"
   | "rule_bias"
+  | "error_cluster"
+  | "error_spike"
+  | "recurring_error"
   | "custom";
 
 export interface Evidence {
@@ -135,6 +138,61 @@ export interface FindingQuery {
   reported?: boolean;
   since?: number;
   severity?: Finding["severity"];
+  limit?: number;
+}
+
+// ─── Error Tracking (Self-Healing) ───
+
+export interface ErrorRecord {
+  id: string;
+  timestamp: number;
+  signature: string;        // Normalized stack trace fingerprint for clustering
+  message: string;
+  stack: string;
+  kind: string;             // Error class: "TypeError", "ValidationError", etc.
+  route?: string;           // API route or page that triggered it
+  method?: string;          // HTTP method
+  actor?: string;
+  request?: Record<string, unknown>;   // Sanitized request context
+  metadata?: Record<string, unknown>;
+  codeContext?: CodeContext;
+}
+
+export interface CodeContext {
+  file: string;             // Source file path
+  line: number;
+  column?: number;
+  functionName?: string;
+  snippet?: string;         // Surrounding lines of code
+}
+
+export interface ErrorCluster {
+  signature: string;
+  count: number;
+  firstSeen: number;
+  lastSeen: number;
+  samples: ErrorRecord[];
+  routes: string[];
+  actors: Set<string>;
+}
+
+export interface ErrorStorageAdapter {
+  insertError(error: ErrorRecord): Promise<void>;
+  queryErrors(query: ErrorQuery): Promise<ErrorRecord[]>;
+  getErrorClusters(since: number): Promise<ErrorCluster[]>;
+  getErrorCountByWindow(
+    signature: string,
+    windowMs: number,
+    buckets: number,
+  ): Promise<number[]>;
+}
+
+export interface ErrorQuery {
+  signature?: string;
+  kind?: string;
+  route?: string;
+  since?: number;
+  until?: number;
   limit?: number;
 }
 

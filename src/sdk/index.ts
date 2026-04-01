@@ -8,6 +8,8 @@ import type {
   MetaHarnessConfig,
   StorageAdapter,
   DecisionStorageAdapter,
+  ErrorStorageAdapter,
+  ErrorRecord,
   Decision,
   Outcome,
   RuleDefinition,
@@ -195,6 +197,92 @@ export class MetaHarness {
       metadata: { method, route, statusCode: params?.statusCode, durationMs: params?.durationMs },
       context: { route, duration: params?.durationMs },
     });
+  }
+
+  // ─── Self-Healing: Error Tracking ───
+
+  captureError(
+    error: Error,
+    context?: {
+      route?: string;
+      method?: string;
+      actor?: string;
+      request?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
+    try {
+      const signature = this.computeErrorSignature(error);
+      const record: ErrorRecord = {
+        id: ulid(),
+        timestamp: Date.now(),
+        signature,
+        message: error.message,
+        stack: error.stack ?? "",
+        kind: error.constructor?.name ?? "Error",
+        route: context?.route,
+        method: context?.method,
+        actor: context?.actor,
+        request: context?.request,
+        metadata: context?.metadata,
+        codeContext: this.extractCodeContext(error),
+      };
+
+      const es = this.storage as StorageAdapter & ErrorStorageAdapter;
+      if (es.insertError) {
+        es.insertError(record).catch(() => {});
+      }
+    } catch {
+      // SDK never throws
+    }
+  }
+
+  private computeErrorSignature(error: Error): string {
+    // Normalize stack trace to create a stable fingerprint
+    // Strip line numbers and file paths to group similar errors
+    const stack = error.stack ?? error.message;
+    const lines = stack.split("\n").slice(0, 5);
+    const normalized = lines
+      .map((line) =>
+        line
+          .replace(/:\d+:\d+\)?$/, "")       // Strip line:col
+          .replace(/\(\/.*\//g, "(")           // Strip absolute paths
+          .replace(/at async /g, "at ")        // Normalize async
+          .trim(),
+      )
+      .join("|");
+    // Simple hash
+    let hash = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      hash = ((hash << 5) - hash + normalized.charCodeAt(i)) | 0;
+    }
+    return `err_${Math.abs(hash).toString(36)}`;
+  }
+
+  private extractCodeContext(error: Error): ErrorRecord["codeContext"] {
+    if (!error.stack) return undefined;
+    // Parse first meaningful stack frame
+    const frames = error.stack.split("\n").slice(1);
+    for (const frame of frames) {
+      const match = frame.match(/at\s+(\S+)\s+\((.+):(\d+):(\d+)\)/);
+      if (match) {
+        return {
+          file: match[2],
+          line: parseInt(match[3], 10),
+          column: parseInt(match[4], 10),
+          functionName: match[1],
+        };
+      }
+      const simpleMatch = frame.match(/at\s+(.+):(\d+):(\d+)/);
+      if (simpleMatch) {
+        return {
+          file: simpleMatch[1],
+          line: parseInt(simpleMatch[2], 10),
+          column: parseInt(simpleMatch[3], 10),
+        };
+      }
+    }
+    return undefined;
   }
 
   // ─── Business Logic Decisions ───

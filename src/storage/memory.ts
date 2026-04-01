@@ -1,6 +1,7 @@
 import type {
   StorageAdapter,
   DecisionStorageAdapter,
+  ErrorStorageAdapter,
   BehavioralEvent,
   Finding,
   EventQuery,
@@ -10,13 +11,17 @@ import type {
   DecisionQuery,
   OutcomeQuery,
   DecisionWithOutcome,
+  ErrorRecord,
+  ErrorQuery,
+  ErrorCluster,
 } from "../types.js";
 
-export class MemoryStorage implements StorageAdapter, DecisionStorageAdapter {
+export class MemoryStorage implements StorageAdapter, DecisionStorageAdapter, ErrorStorageAdapter {
   private events: BehavioralEvent[] = [];
   private findings: Finding[] = [];
   private decisions: Decision[] = [];
   private outcomes: Outcome[] = [];
+  private errors: ErrorRecord[] = [];
 
   async insertEvent(event: BehavioralEvent): Promise<void> {
     this.events.push(event);
@@ -140,10 +145,79 @@ export class MemoryStorage implements StorageAdapter, DecisionStorageAdapter {
     return Array.from(rules);
   }
 
+  // ─── Error Storage ───
+
+  async insertError(error: ErrorRecord): Promise<void> {
+    this.errors.push(error);
+  }
+
+  async queryErrors(query: ErrorQuery): Promise<ErrorRecord[]> {
+    let results = this.errors;
+
+    if (query.signature) results = results.filter((e) => e.signature === query.signature);
+    if (query.kind) results = results.filter((e) => e.kind === query.kind);
+    if (query.route) results = results.filter((e) => e.route === query.route);
+    if (query.since) results = results.filter((e) => e.timestamp >= query.since!);
+    if (query.until) results = results.filter((e) => e.timestamp <= query.until!);
+    if (query.limit) results = results.slice(0, query.limit);
+
+    return results;
+  }
+
+  async getErrorClusters(since: number): Promise<ErrorCluster[]> {
+    const recent = this.errors.filter((e) => e.timestamp >= since);
+    const clusterMap = new Map<string, ErrorCluster>();
+
+    for (const error of recent) {
+      if (!clusterMap.has(error.signature)) {
+        clusterMap.set(error.signature, {
+          signature: error.signature,
+          count: 0,
+          firstSeen: error.timestamp,
+          lastSeen: error.timestamp,
+          samples: [],
+          routes: [],
+          actors: new Set(),
+        });
+      }
+      const cluster = clusterMap.get(error.signature)!;
+      cluster.count++;
+      if (error.timestamp < cluster.firstSeen) cluster.firstSeen = error.timestamp;
+      if (error.timestamp > cluster.lastSeen) cluster.lastSeen = error.timestamp;
+      if (cluster.samples.length < 5) cluster.samples.push(error);
+      if (error.route && !cluster.routes.includes(error.route)) cluster.routes.push(error.route);
+      if (error.actor) cluster.actors.add(error.actor);
+    }
+
+    return Array.from(clusterMap.values()).sort((a, b) => b.count - a.count);
+  }
+
+  async getErrorCountByWindow(
+    signature: string,
+    windowMs: number,
+    buckets: number,
+  ): Promise<number[]> {
+    const now = Date.now();
+    const bucketSize = windowMs / buckets;
+    const counts = new Array(buckets).fill(0) as number[];
+
+    const matching = this.errors.filter(
+      (e) => e.signature === signature && e.timestamp >= now - windowMs,
+    );
+
+    for (const error of matching) {
+      const bucket = Math.floor((now - error.timestamp) / bucketSize);
+      if (bucket >= 0 && bucket < buckets) counts[buckets - 1 - bucket]++;
+    }
+
+    return counts;
+  }
+
   async close(): Promise<void> {
     this.events = [];
     this.findings = [];
     this.decisions = [];
     this.outcomes = [];
+    this.errors = [];
   }
 }

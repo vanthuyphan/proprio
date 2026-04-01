@@ -8,6 +8,7 @@ export { GitHubReporter } from "./reporters/github.js";
 export { ClaudeLLMProvider } from "./llm/claude.js";
 export { RuleEffectivenessAnalyzer } from "./analyzers/rule-effectiveness.js";
 export { InputCorrelationAnalyzer } from "./analyzers/input-correlation.js";
+export { ErrorClusterAnalyzer } from "./analyzers/error-cluster.js";
 export { loadConfig, mergeConfig, parseWindow } from "./config.js";
 
 export type {
@@ -35,4 +36,9 @@ export type {
   DecisionQuery,
   OutcomeQuery,
   DecisionWithOutcome,
+  ErrorRecord,
+  ErrorQuery,
+  ErrorCluster,
+  ErrorStorageAdapter,
+  CodeContext,
 } from "./types.js";

@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import type {
   StorageAdapter,
   DecisionStorageAdapter,
+  ErrorStorageAdapter,
   BehavioralEvent,
   Finding,
   EventQuery,
@@ -11,9 +12,12 @@ import type {
   DecisionQuery,
   OutcomeQuery,
   DecisionWithOutcome,
+  ErrorRecord,
+  ErrorQuery,
+  ErrorCluster,
 } from "../types.js";
 
-export class SqliteStorage implements StorageAdapter, DecisionStorageAdapter {
+export class SqliteStorage implements StorageAdapter, DecisionStorageAdapter, ErrorStorageAdapter {
   private db: Database.Database;
 
   constructor(path: string) {
@@ -86,6 +90,25 @@ export class SqliteStorage implements StorageAdapter, DecisionStorageAdapter {
 
       CREATE INDEX IF NOT EXISTS idx_outcomes_decision ON outcomes(decision_id);
       CREATE INDEX IF NOT EXISTS idx_outcomes_result ON outcomes(result);
+
+      CREATE TABLE IF NOT EXISTS errors (
+        id TEXT PRIMARY KEY,
+        timestamp INTEGER NOT NULL,
+        signature TEXT NOT NULL,
+        message TEXT NOT NULL,
+        stack TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        route TEXT,
+        method TEXT,
+        actor TEXT,
+        request TEXT,
+        metadata TEXT,
+        code_context TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_errors_signature ON errors(signature);
+      CREATE INDEX IF NOT EXISTS idx_errors_timestamp ON errors(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_errors_kind ON errors(kind);
     `);
   }
 
@@ -396,6 +419,129 @@ export class SqliteStorage implements StorageAdapter, DecisionStorageAdapter {
       .prepare("SELECT DISTINCT rule FROM decisions WHERE timestamp >= ?")
       .all(since) as Array<{ rule: string }>;
     return rows.map((r) => r.rule);
+  }
+
+  // ─── Error Storage ───
+
+  async insertError(error: ErrorRecord): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO errors (id, timestamp, signature, message, stack, kind, route, method, actor, request, metadata, code_context)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      error.id,
+      error.timestamp,
+      error.signature,
+      error.message,
+      error.stack,
+      error.kind,
+      error.route ?? null,
+      error.method ?? null,
+      error.actor ?? null,
+      error.request ? JSON.stringify(error.request) : null,
+      error.metadata ? JSON.stringify(error.metadata) : null,
+      error.codeContext ? JSON.stringify(error.codeContext) : null,
+    );
+  }
+
+  async queryErrors(query: ErrorQuery): Promise<ErrorRecord[]> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (query.signature) { conditions.push("signature = ?"); params.push(query.signature); }
+    if (query.kind) { conditions.push("kind = ?"); params.push(query.kind); }
+    if (query.route) { conditions.push("route = ?"); params.push(query.route); }
+    if (query.since) { conditions.push("timestamp >= ?"); params.push(query.since); }
+    if (query.until) { conditions.push("timestamp <= ?"); params.push(query.until); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const limit = query.limit ? `LIMIT ${query.limit}` : "";
+    const rows = this.db.prepare(`SELECT * FROM errors ${where} ORDER BY timestamp DESC ${limit}`)
+      .all(...params) as Array<Record<string, unknown>>;
+
+    return rows.map((row) => ({
+      id: row.id as string,
+      timestamp: row.timestamp as number,
+      signature: row.signature as string,
+      message: row.message as string,
+      stack: row.stack as string,
+      kind: row.kind as string,
+      route: (row.route as string) ?? undefined,
+      method: (row.method as string) ?? undefined,
+      actor: (row.actor as string) ?? undefined,
+      request: row.request ? JSON.parse(row.request as string) : undefined,
+      metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+      codeContext: row.code_context ? JSON.parse(row.code_context as string) : undefined,
+    }));
+  }
+
+  async getErrorClusters(since: number): Promise<ErrorCluster[]> {
+    const rows = this.db.prepare(`
+      SELECT signature, COUNT(*) as count, MIN(timestamp) as first_seen, MAX(timestamp) as last_seen
+      FROM errors WHERE timestamp >= ?
+      GROUP BY signature ORDER BY count DESC
+    `).all(since) as Array<{ signature: string; count: number; first_seen: number; last_seen: number }>;
+
+    const clusters: ErrorCluster[] = [];
+
+    for (const row of rows) {
+      const samples = this.db.prepare(
+        `SELECT * FROM errors WHERE signature = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT 5`
+      ).all(row.signature, since) as Array<Record<string, unknown>>;
+
+      const routes = this.db.prepare(
+        `SELECT DISTINCT route FROM errors WHERE signature = ? AND timestamp >= ? AND route IS NOT NULL`
+      ).all(row.signature, since) as Array<{ route: string }>;
+
+      const actors = this.db.prepare(
+        `SELECT DISTINCT actor FROM errors WHERE signature = ? AND timestamp >= ? AND actor IS NOT NULL`
+      ).all(row.signature, since) as Array<{ actor: string }>;
+
+      clusters.push({
+        signature: row.signature,
+        count: row.count,
+        firstSeen: row.first_seen,
+        lastSeen: row.last_seen,
+        samples: samples.map((s) => ({
+          id: s.id as string,
+          timestamp: s.timestamp as number,
+          signature: s.signature as string,
+          message: s.message as string,
+          stack: s.stack as string,
+          kind: s.kind as string,
+          route: (s.route as string) ?? undefined,
+          method: (s.method as string) ?? undefined,
+          actor: (s.actor as string) ?? undefined,
+          request: s.request ? JSON.parse(s.request as string) : undefined,
+          metadata: s.metadata ? JSON.parse(s.metadata as string) : undefined,
+          codeContext: s.code_context ? JSON.parse(s.code_context as string) : undefined,
+        })),
+        routes: routes.map((r) => r.route),
+        actors: new Set(actors.map((a) => a.actor)),
+      });
+    }
+
+    return clusters;
+  }
+
+  async getErrorCountByWindow(
+    signature: string,
+    windowMs: number,
+    buckets: number,
+  ): Promise<number[]> {
+    const now = Date.now();
+    const bucketSize = windowMs / buckets;
+    const counts = new Array(buckets).fill(0) as number[];
+
+    const rows = this.db.prepare(
+      `SELECT timestamp FROM errors WHERE signature = ? AND timestamp >= ?`
+    ).all(signature, now - windowMs) as Array<{ timestamp: number }>;
+
+    for (const row of rows) {
+      const bucket = Math.floor((now - row.timestamp) / bucketSize);
+      if (bucket >= 0 && bucket < buckets) counts[buckets - 1 - bucket]++;
+    }
+
+    return counts;
   }
 
   async close(): Promise<void> {

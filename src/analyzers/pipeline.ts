@@ -16,6 +16,7 @@ import { EmergingWorkflowAnalyzer } from "./emerging-workflow.js";
 import { ThresholdMismatchAnalyzer } from "./threshold-mismatch.js";
 import { RuleEffectivenessAnalyzer } from "./rule-effectiveness.js";
 import { InputCorrelationAnalyzer } from "./input-correlation.js";
+import { ErrorClusterAnalyzer } from "./error-cluster.js";
 import type { RuleDefinition } from "../types.js";
 
 function buildAnalyzers(rules?: Map<string, RuleDefinition>): Record<string, () => Analyzer> {
@@ -27,6 +28,7 @@ function buildAnalyzers(rules?: Map<string, RuleDefinition>): Record<string, () 
     threshold_mismatch: () => new ThresholdMismatchAnalyzer(),
     rule_ineffective: () => new RuleEffectivenessAnalyzer(rules),
     input_correlation: () => new InputCorrelationAnalyzer(rules),
+    error_cluster: () => new ErrorClusterAnalyzer(),
   };
 }
 
