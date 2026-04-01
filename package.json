@@ -1,0 +1,53 @@
+{
+  "name": "meta-harness",
+  "version": "0.1.0",
+  "description": "Framework for building self-evolving software through behavioral analysis",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "meta-harness": "./dist/bin/meta-harness.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/sdk/middleware.d.ts",
+      "import": "./dist/sdk/middleware.mjs",
+      "require": "./dist/sdk/middleware.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["self-evolving", "meta-harness", "behavioral-analysis", "product-insights"],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.30.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "@types/node-cron": "^3.0.11",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "commander": "^13.1.0",
+    "node-cron": "^4.2.1",
+    "ulid": "^3.0.2"
+  }
+}
