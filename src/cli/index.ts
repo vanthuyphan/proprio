@@ -8,13 +8,13 @@ import { findingsCommand } from "./commands/findings.js";
 const program = new Command();
 
 program
-  .name("meta-harness")
+  .name("proprio")
   .description("Framework for building self-evolving software through behavioral analysis")
   .version("0.1.0");
 
 program
   .command("init")
-  .description("Initialize meta-harness configuration")
+  .description("Initialize proprio configuration")
   .action(initCommand);
 
 program

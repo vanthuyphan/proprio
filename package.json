@@ -1,11 +1,11 @@
 {
-  "name": "meta-harness",
+  "name": "proprio",
   "version": "0.1.0",
-  "description": "Framework for building self-evolving software through behavioral analysis",
+  "description": "Self-evolving software framework — track behavior, analyze decisions, evolve requirements",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "meta-harness": "./dist/bin/meta-harness.js"
+    "proprio": "./dist/bin/meta-harness.js"
   },
   "exports": {
     ".": {
@@ -25,7 +25,7 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["self-evolving", "meta-harness", "behavioral-analysis", "product-insights"],
+  "keywords": ["self-evolving", "proprio", "behavioral-analysis", "product-insights", "business-logic", "decision-tracking"],
   "author": "",
   "license": "MIT",
   "peerDependencies": {

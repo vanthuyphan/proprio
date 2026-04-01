@@ -20,7 +20,7 @@ ${c.events
     )
     .join("\n---\n");
 
-  return `You are a behavioral analysis engine for a self-evolving software framework called meta-harness.
+  return `You are a behavioral analysis engine for a self-evolving software framework called proprio.
 
 You are given ambiguous cases that deterministic rules could not classify. For each case, decide whether it represents a real finding that the product team should act on.
 

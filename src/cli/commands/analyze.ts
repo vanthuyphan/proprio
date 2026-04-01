@@ -29,7 +29,7 @@ export async function analyzeCommand(
         }),
       );
     } else {
-      console.warn("[meta-harness] GitHub reporter enabled but no token found. Set GITHUB_TOKEN env var.");
+      console.warn("[proprio] GitHub reporter enabled but no token found. Set GITHUB_TOKEN env var.");
     }
   }
 
@@ -40,7 +40,7 @@ export async function analyzeCommand(
     if (apiKey) {
       llm = new ClaudeLLMProvider(apiKey, config.llm.model);
     } else {
-      console.warn("[meta-harness] Claude LLM enabled but no API key found. Set ANTHROPIC_API_KEY env var.");
+      console.warn("[proprio] Claude LLM enabled but no API key found. Set ANTHROPIC_API_KEY env var.");
     }
   }
 

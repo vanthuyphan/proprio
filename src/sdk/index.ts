@@ -316,7 +316,7 @@ export class MetaHarness {
     const { adapter, path } = this.config.storage;
     if (adapter === "memory") return new MemoryStorage();
 
-    const dbPath = path ?? "./.meta-harness/events.db";
+    const dbPath = path ?? "./.proprio/events.db";
     const dir = dirname(dbPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     return new SqliteStorage(dbPath);

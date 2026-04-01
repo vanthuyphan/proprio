@@ -19,7 +19,7 @@ export class ClaudeLLMProvider implements LLMProvider {
       const mod = await import("@anthropic-ai/sdk");
       Anthropic = mod.default;
     } catch {
-      console.error("[meta-harness] @anthropic-ai/sdk not installed. Skipping LLM escalation.");
+      console.error("[proprio] @anthropic-ai/sdk not installed. Skipping LLM escalation.");
       return [];
     }
 
@@ -41,7 +41,7 @@ export class ClaudeLLMProvider implements LLMProvider {
     try {
       parsed = JSON.parse(text);
     } catch {
-      console.error("[meta-harness] Failed to parse LLM response:", text.slice(0, 200));
+      console.error("[proprio] Failed to parse LLM response:", text.slice(0, 200));
       return [];
     }
 

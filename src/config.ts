@@ -2,10 +2,10 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import type { MetaHarnessConfig } from "./types.js";
 
-const CONFIG_FILES = [".meta-harness.json", ".meta-harness.yaml", "meta-harness.config.json"];
+const CONFIG_FILES = [".proprio.json", ".proprio.yaml", "proprio.config.json"];
 
 const DEFAULTS: Required<MetaHarnessConfig> = {
-  storage: { adapter: "sqlite", path: "./.meta-harness/events.db" },
+  storage: { adapter: "sqlite", path: "./.proprio/events.db" },
   analyzers: {
     enabled: ["workaround", "dead_feature", "friction", "emerging_workflow", "threshold_mismatch"],
     window: "7d",
