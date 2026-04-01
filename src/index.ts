@@ -6,6 +6,7 @@ export { MemoryStorage } from "./storage/memory.js";
 export { ConsoleReporter } from "./reporters/console.js";
 export { GitHubReporter } from "./reporters/github.js";
 export { ClaudeLLMProvider } from "./llm/claude.js";
+export { FixGenerator } from "./llm/fix-generator.js";
 export { RuleEffectivenessAnalyzer } from "./analyzers/rule-effectiveness.js";
 export { InputCorrelationAnalyzer } from "./analyzers/input-correlation.js";
 export { ErrorClusterAnalyzer } from "./analyzers/error-cluster.js";
@@ -41,4 +42,6 @@ export type {
   ErrorCluster,
   ErrorStorageAdapter,
   CodeContext,
+  FixProposal,
+  FileDiff,
 } from "./types.js";

@@ -17,7 +17,8 @@ import { ThresholdMismatchAnalyzer } from "./threshold-mismatch.js";
 import { RuleEffectivenessAnalyzer } from "./rule-effectiveness.js";
 import { InputCorrelationAnalyzer } from "./input-correlation.js";
 import { ErrorClusterAnalyzer } from "./error-cluster.js";
-import type { RuleDefinition } from "../types.js";
+import { FixGenerator } from "../llm/fix-generator.js";
+import type { RuleDefinition, FixProposal } from "../types.js";
 
 function buildAnalyzers(rules?: Map<string, RuleDefinition>): Record<string, () => Analyzer> {
   return {
@@ -39,6 +40,7 @@ export interface PipelineOptions {
   reporters?: Reporter[];
   dryRun?: boolean;
   rules?: Map<string, RuleDefinition>;
+  generateFixes?: boolean;
 }
 
 export interface PipelineResult {
@@ -46,6 +48,7 @@ export interface PipelineResult {
   ambiguousCases: number;
   escalated: number;
   reported: number;
+  fixes: number;
 }
 
 export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
@@ -113,6 +116,24 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     deduped.push(...llmFindings);
   }
 
+  // Auto-evolve mode: generate fix proposals for actionable findings
+  let fixCount = 0;
+  if (options.generateFixes && config.llm.provider === "claude") {
+    const apiKey = config.llm.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (apiKey) {
+      const fixGenerator = new FixGenerator({ apiKey, model: config.llm.model });
+      const fixableTypes = ["error_cluster", "error_spike", "recurring_error"];
+      const fixable = deduped.filter(
+        (f) => fixableTypes.includes(f.type) && f.severity !== "info",
+      );
+
+      if (fixable.length > 0) {
+        const fixes = await fixGenerator.generateFixes(fixable);
+        fixCount = fixes.size;
+      }
+    }
+  }
+
   // Store findings
   for (const finding of deduped) {
     await storage.insertFinding(finding);
@@ -137,6 +158,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
 
   return {
     findings: deduped,
+    fixes: fixCount,
     ambiguousCases: allAmbiguous.length,
     escalated: escalatedCount,
     reported: reportedCount,

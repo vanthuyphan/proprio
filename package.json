@@ -19,13 +19,25 @@
       "require": "./dist/sdk/middleware.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["self-evolving", "proprio", "behavioral-analysis", "product-insights", "business-logic", "decision-tracking"],
+  "keywords": [
+    "self-evolving",
+    "proprio",
+    "behavioral-analysis",
+    "product-insights",
+    "business-logic",
+    "decision-tracking"
+  ],
   "author": "",
   "license": "MIT",
   "peerDependencies": {
@@ -48,6 +60,7 @@
     "better-sqlite3": "^11.10.0",
     "commander": "^13.1.0",
     "node-cron": "^4.2.1",
+    "proprio": "^0.1.0",
     "ulid": "^3.0.2"
   }
 }

@@ -47,6 +47,7 @@ export interface Finding {
   description: string;
   evidence: Evidence[];
   suggestion?: string;
+  fix?: FixProposal;
   analyzedAt: number;
   reported: boolean;
   reportRef?: string;
@@ -194,6 +195,23 @@ export interface ErrorQuery {
   since?: number;
   until?: number;
   limit?: number;
+}
+
+// ─── Fix Proposals ───
+
+export interface FixProposal {
+  file: string;              // File to change
+  diff: FileDiff[];          // One or more changes in the file
+  explanation: string;       // Why this fix works
+  confidence: number;        // 0-1 how confident the LLM is
+  breaking: boolean;         // Could this change break other things?
+}
+
+export interface FileDiff {
+  oldCode: string;           // The code to replace
+  newCode: string;           // The replacement
+  startLine: number;         // Where in the file
+  endLine: number;
 }
 
 // ─── Reporter ───
