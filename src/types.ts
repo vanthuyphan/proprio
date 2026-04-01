@@ -293,6 +293,54 @@ export interface DecisionWithOutcome {
   outcome?: Outcome;
 }
 
+// ─── Replay Engine ───
+
+export type RuleFunction = (inputs: Record<string, unknown>) => string;
+
+export interface ReplayResult {
+  rule: string;
+  totalDecisions: number;
+  decisionsWithOutcomes: number;
+  changed: number;                    // Decisions that would have a different output
+  unchanged: number;
+
+  // Impact prediction
+  currentSuccessRate: number;
+  predictedSuccessRate: number;
+  successDelta: number;               // positive = improvement
+
+  currentRevenue: number;
+  predictedRevenue: number;
+  revenueDelta: number;
+
+  // Breakdown by output
+  outputChanges: OutputChange[];
+
+  // Risk flags
+  risks: string[];
+
+  // Individual replayed decisions (sample)
+  samples: ReplayedDecision[];
+}
+
+export interface OutputChange {
+  from: string;
+  to: string;
+  count: number;
+  currentSuccessRate: number;
+  predictedSuccessRate: number;
+}
+
+export interface ReplayedDecision {
+  decisionId: string;
+  inputs: Record<string, unknown>;
+  originalOutput: string;
+  newOutput: string;
+  actualOutcome?: string;
+  actualValue?: number;
+  predictedOutcome?: string;
+}
+
 // ─── Config ───
 
 export interface MetaHarnessConfig {

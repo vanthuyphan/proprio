@@ -13,7 +13,10 @@ import type {
   Decision,
   Outcome,
   RuleDefinition,
+  RuleFunction,
+  ReplayResult,
 } from "../types.js";
+import { replay, formatReplayReport } from "../replay/engine.js";
 import { mergeConfig } from "../config.js";
 import { SqliteStorage } from "../storage/sqlite.js";
 import { MemoryStorage } from "../storage/memory.js";
@@ -347,6 +350,31 @@ export class MetaHarness {
 
   getRules(): Map<string, RuleDefinition> {
     return this.rules;
+  }
+
+  // ─── Replay Engine ───
+
+  async simulate(
+    ruleName: string,
+    newLogic: RuleFunction,
+    options?: { since?: number; print?: boolean },
+  ): Promise<ReplayResult> {
+    await this.flush();
+
+    const ds = this.storage as StorageAdapter & DecisionStorageAdapter;
+    const result = await replay({
+      storage: ds,
+      rule: ruleName,
+      ruleDef: this.rules.get(ruleName),
+      newLogic,
+      since: options?.since,
+    });
+
+    if (options?.print !== false) {
+      console.log(formatReplayReport(result));
+    }
+
+    return result;
   }
 
   private async flushDecisions(): Promise<void> {

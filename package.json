@@ -1,6 +1,6 @@
 {
   "name": "proprio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Self-evolving software framework — track behavior, analyze decisions, evolve requirements",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

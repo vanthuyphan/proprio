@@ -147,6 +147,46 @@ app.use((err, req, res, next) => {
 
 Errors are automatically fingerprinted by stack trace signature, so 500 occurrences of the same bug become one finding — not 500 issues.
 
+### Replay Engine — test rule changes before deploying
+
+Before you change a business rule, replay your historical decisions through the new logic and see what would happen.
+
+```typescript
+const result = await harness.simulate(
+  "lead.auto_assign",
+  // New rule: lower credit score threshold from 700 to 650
+  (inputs) => {
+    const score = inputs.creditScore as number;
+    return score > 650 ? "auto_assign" : "manual_review";
+  },
+);
+```
+
+Output:
+```
+=== Replay Report: "lead.auto_assign" ===
+
+Replayed 1,247 decisions
+
+  Changed:   183 decisions would have a different output
+  Unchanged: 1,064
+
+  Current success rate:   24.5%
+  Predicted success rate: 31.2% (+6.7%)
+
+  Current revenue:   $892,400
+  Predicted revenue: $1,134,800 (+$242,400)
+
+  Output changes:
+    manual_review → auto_assign: 183 decisions
+      Success rate: 18.0% → 34.2%
+
+  Risks:
+    ⚠ Output "auto_assign" would handle 87% of all decisions. Possible overload.
+```
+
+The data is already there — you're tracking decisions and outcomes. The replay engine just runs your new logic against real historical inputs and predicts the impact.
+
 ### Run analysis
 
 ```bash

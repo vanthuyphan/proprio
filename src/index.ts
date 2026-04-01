@@ -10,6 +10,7 @@ export { FixGenerator } from "./llm/fix-generator.js";
 export { RuleEffectivenessAnalyzer } from "./analyzers/rule-effectiveness.js";
 export { InputCorrelationAnalyzer } from "./analyzers/input-correlation.js";
 export { ErrorClusterAnalyzer } from "./analyzers/error-cluster.js";
+export { replay, formatReplayReport } from "./replay/engine.js";
 export { loadConfig, mergeConfig, parseWindow } from "./config.js";
 
 export type {
@@ -44,4 +45,8 @@ export type {
   CodeContext,
   FixProposal,
   FileDiff,
+  RuleFunction,
+  ReplayResult,
+  OutputChange,
+  ReplayedDecision,
 } from "./types.js";
