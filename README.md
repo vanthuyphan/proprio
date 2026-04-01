@@ -1,6 +1,6 @@
 # proprio
 
-Self-evolving software framework. Track how users behave, analyze how your business rules perform, and let your software tell you what needs to change — backed by data, not guesses.
+Self-evolving software framework. Track how users behave, analyze how your business rules perform, catch bugs before your users report them — and let your software tell you what needs to change, backed by data.
 
 ## The idea
 
@@ -10,9 +10,9 @@ Proprio adds proprioception to your software. Like the body's ability to sense i
 
 **It proposes. You approve. The system evolves.**
 
-## Two layers
+## Three layers
 
-### UX Harness — how users actually use your app
+### 1. UX Harness — how users actually use your app
 
 Auto-captures behavioral signals:
 - Rage clicks (users hammering unresponsive buttons)
@@ -23,13 +23,20 @@ Auto-captures behavioral signals:
 - Dead features (features nobody touches)
 - Emerging workflows (repeated multi-step patterns that should be a shortcut)
 
-### Business Logic Harness — do your rules actually work?
+### 2. Business Logic Harness — do your rules actually work?
 
 Tracks every decision your code makes and what actually happens:
 - **Rule effectiveness** — "Your auto-assign rule has a 16% success rate. It's hurting you."
 - **Rule drift** — "This rule worked at 80% three months ago. It's at 30% now. Something changed."
 - **Input correlation** — "You weight credit score at 40%, but it has near-zero correlation with conversion. Response time (not in your rule) correlates at 0.7."
 - **Rule bias** — "Leads routed to LO #5 convert 20% worse than average."
+
+### 3. Self-Healing Harness — catch and fix bugs automatically
+
+Captures errors with full context and proposes fixes:
+- **Error clustering** — groups similar errors by stack trace signature instead of flooding you with duplicates
+- **Spike detection** — "This error jumped 10x in the last hour. Likely a regression from a recent deploy."
+- **Recurring errors** — "This error has been happening consistently for 7 days. It needs a real fix, not a retry."
 
 ## Quick start
 
@@ -40,7 +47,7 @@ npm install proprio
 ### Track user behavior
 
 ```typescript
-import { MetaHarness } from "proprio";
+import { MetaHarness, metaHarnessMiddleware } from "proprio";
 
 const harness = new MetaHarness();
 
@@ -86,6 +93,23 @@ harness.trackOutcome({
 });
 ```
 
+### Capture errors
+
+```typescript
+// In your error handler
+app.use((err, req, res, next) => {
+  harness.captureError(err, {
+    route: req.path,
+    method: req.method,
+    actor: req.user?.id,
+    request: { query: req.query, body: req.body },
+  });
+  next(err);
+});
+```
+
+Errors are automatically fingerprinted by stack trace signature, so 500 occurrences of the same bug become one finding — not 500 issues.
+
 ### Run analysis
 
 ```bash
@@ -97,6 +121,8 @@ npx proprio events --since 7d
 
 ## Built-in analyzers
 
+### UX
+
 | Analyzer | Detects |
 |---|---|
 | `dead_feature` | Features with zero or near-zero usage |
@@ -104,10 +130,23 @@ npx proprio events --since 7d
 | `workaround` | Structured data in free-text fields (users working around missing features) |
 | `emerging_workflow` | Repeated multi-step sequences across users |
 | `threshold_mismatch` | Business rule thresholds that don't match actual data distributions |
+
+### Business Logic
+
+| Analyzer | Detects |
+|---|---|
 | `rule_ineffective` | Rules with low success rates |
 | `rule_drift` | Rules whose effectiveness has degraded over time |
 | `input_correlation` | Inputs that don't predict success, and hidden predictors the rule ignores |
 | `rule_bias` | Decision outputs that produce worse outcomes than others |
+
+### Self-Healing
+
+| Analyzer | Detects |
+|---|---|
+| `error_cluster` | Groups of similar errors with stack traces, affected routes, and user counts |
+| `error_spike` | Sudden increase in error rate (likely regression from a deploy) |
+| `recurring_error` | Chronic errors present throughout the analysis window |
 
 ## Configuration
 
@@ -115,14 +154,16 @@ npx proprio events --since 7d
 npx proprio init
 ```
 
-Creates `.meta-harness.json`:
+Creates `.proprio.json`:
 
 ```json
 {
-  "storage": { "adapter": "sqlite", "path": "./.meta-harness/events.db" },
+  "storage": { "adapter": "sqlite", "path": "./.proprio/events.db" },
   "analyzers": {
-    "enabled": ["workaround", "dead_feature", "friction", "emerging_workflow",
-                "rule_ineffective", "input_correlation"],
+    "enabled": [
+      "workaround", "dead_feature", "friction", "emerging_workflow",
+      "rule_ineffective", "input_correlation", "error_cluster"
+    ],
     "window": "7d"
   },
   "llm": { "provider": "claude" },
@@ -138,25 +179,27 @@ Set `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` as environment variables.
 ## How it works
 
 ```
-Your App ──track()──> Proprio SDK ──buffer──> SQLite
-                                                │
-                    npx proprio analyze         │
-                          │                     │
-              ┌───────────┴───────────┐         │
-              │  Analyzers (rules)    │◄────────┘
-              │  + LLM escalation     │
-              └───────────┬───────────┘
-                          │
-                    Findings
-                          │
-              ┌───────────┴───────────┐
-              │  Reporters            │
-              │  (GitHub Issues, CLI) │
-              └───────────────────────┘
+Your App ──track()──────────> Proprio SDK ──buffer──> SQLite
+         ──trackDecision()──>                           │
+         ──captureError()───>                           │
+                                                        │
+                          npx proprio analyze           │
+                                │                       │
+                    ┌───────────┴───────────┐           │
+                    │  12 Analyzers (rules) │◄──────────┘
+                    │  + LLM escalation     │
+                    └───────────┬───────────┘
+                                │
+                          Findings
+                                │
+                    ┌───────────┴───────────┐
+                    │  Reporters            │
+                    │  (GitHub Issues, CLI) │
+                    └───────────────────────┘
 ```
 
-1. Your app tracks events and decisions via the SDK
-2. Events buffer locally (SQLite) — no external service needed
+1. Your app tracks events, decisions, and errors via the SDK
+2. Everything buffers locally (SQLite) — no external service needed
 3. Analyzers run deterministic rules to detect patterns
 4. Ambiguous cases escalate to Claude for reasoning
 5. Findings get reported as GitHub Issues (or console output)
@@ -175,6 +218,15 @@ When a deterministic rule can't decide (e.g., 25% drop-off — is that friction 
 LLM is optional. Set `"provider": "none"` to run pure rules.
 
 Cost is predictable: `maxEscalationsPerRun` caps how many cases go to the LLM per analysis (default: 10).
+
+## SDK design principles
+
+- `track()` and `captureError()` **never throw** — errors go to stderr, your app keeps running
+- Events buffer in memory, flush in batches — zero impact on app performance
+- No outbound network calls from the SDK — all data stays local
+- Storage is pluggable (SQLite default, in-memory for testing)
+- Analyzers are pluggable — write your own by implementing the `Analyzer` interface
+- Reporters are pluggable — GitHub Issues and console included, extend for Slack/email/etc.
 
 ## License
 
