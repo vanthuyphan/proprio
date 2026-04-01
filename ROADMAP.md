@@ -45,15 +45,6 @@ Sentry tells you "you have a bug." PostHog tells you "users clicked here." Propr
 
 ## Next up
 
-### Promotion
-- [ ] Blog post — lead with the idea, not the package
-- [ ] Twitter/X thread with replay engine output screenshot
-- [ ] Reddit post (r/programming, r/node) as discussion
-- [ ] 2-min demo video
-- [ ] Hacker News "Show HN" post
-- [ ] Add GitHub topics to repo
-- [ ] Integrate proprio into the leads pipeline project as a real-world showcase
-
 ### Features to build
 - [ ] **Auto-instrument** — read codebase, find routes/forms/decision points, add tracking automatically. Zero-config onboarding.
 - [ ] **Feedback loop** — after a fix is deployed, track whether it actually worked. "The rule change improved conversion from 20% to 45%."
